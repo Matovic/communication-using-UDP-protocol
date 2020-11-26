@@ -13,11 +13,8 @@ def receive_message(server_port):
     print('Server is ready!')
     while 1:
         message, client_address = server_socket.recvfrom(2048)
-        print("here")
         modified_message = message.upper()
-        print("also here?")
         server_socket.sendto(modified_message, client_address)
-        print("probably not here")
         if input('End? y/N?') == 'y':
             break
         else:
@@ -58,4 +55,3 @@ def user_interface():
             client.user_interface()
         else:
             print('\n{:^30}'.format('Wrong input! Try again.\n'))
-
