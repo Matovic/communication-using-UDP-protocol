@@ -3,6 +3,8 @@
 # Zadanie 2: UDP communicator
 
 import client
+import protocol
+
 import socket
 import sys
 

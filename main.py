@@ -2,9 +2,10 @@
 # PKS
 # Zadanie 2: UDP communicator
 
-import sys
 import client
 import server
+
+import sys
 
 
 def main():
