@@ -4,7 +4,8 @@
 
 import math
 
-MSG_TYPE_INITIALIZATION = 0  # constant for header in initialization
+MSG_TYPE_INITIALIZATION = '0'  # constant for header in initialization
+MSG_TYPE_TXT = '1'             # constant for header for text msg
 
 
 def set_crc(data):
@@ -14,15 +15,16 @@ def set_crc(data):
 
 def add_header(msg_type, serial_num, fragment_size, num_of_fragment, data):
     checksum = set_crc(data)
-    new_data = msg_type + serial_num + fragment_size + num_of_fragment + checksum + data[:]
+    new_data = bytes(msg_type, 'utf-8') + bytes(str(serial_num), 'utf-8') + bytes(str(fragment_size), 'utf-8') + \
+               bytes(str(num_of_fragment), 'utf-8') + bytes(str(checksum), 'utf-8') + data[:]
     return new_data
 
 
 def msg_initialization(fragment_size, data):
-    num_of_fragment = math.ceil(data.size() / fragment_size) \
-        if data.size() > fragment_size \
+    num_of_fragment = math.ceil(len(data) / fragment_size) \
+        if len(data) > fragment_size \
         else 1
-    add_header(MSG_TYPE_INITIALIZATION, data.size(), fragment_size, num_of_fragment, data)
+    return add_header(MSG_TYPE_INITIALIZATION, MSG_TYPE_INITIALIZATION, fragment_size, num_of_fragment, data)
 
 
 class Protocol:

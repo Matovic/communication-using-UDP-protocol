@@ -7,6 +7,27 @@ import protocol
 
 import socket
 import sys
+import select
+
+
+def receive_file(server_port):
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_socket.bind(('', server_port))
+    print('Server is ready!')
+    data, client_address = server_socket.recvfrom(2048)
+    data = data.decode('utf-8')
+    file_name = data.strip()
+    with open('file_receive/' + file_name, 'wb+') as file:
+        while True:
+            ready = select.select([server_socket], [], [], 3)
+            if ready[0]:
+                data, client_address = server_socket.recvfrom(2048)
+                file.write(data)
+            else:
+                print('Finish', file_name)
+                break
+    server_socket.sendto(b'Message received!', client_address)
+    server_socket.close()
 
 
 def receive_message(server_port):
@@ -15,8 +36,8 @@ def receive_message(server_port):
     print('Server is ready!')
     while 1:
         message, client_address = server_socket.recvfrom(2048)
-        modified_message = message.upper()
-        server_socket.sendto(modified_message, client_address)
+        print(message.decode('utf-8'))
+        server_socket.sendto(b'Message received!', client_address)
         if input('End? y/N?') == 'y':
             break
         else:
@@ -46,6 +67,7 @@ def user_interface():
     while 1:
         print('0 - end\n'
               '1 - receive\n'
+              '2 - file\n'
               '9 - change to client')
         user_input = input('Enter what do you want to do: ')
         if user_input == '0':
@@ -53,6 +75,8 @@ def user_interface():
             sys.exit(0)
         elif user_input == '1':
             receive_message(server_port)
+        elif user_input == '2':
+            receive_file(server_port)
         elif user_input == '9':
             client.user_interface()
         else:
