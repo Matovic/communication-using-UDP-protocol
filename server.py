@@ -10,10 +10,24 @@ import sys
 import select
 
 
+def read_set(data):
+    if data[7:8].decode('utf-8') != protocol.set_crc(data):
+        return protocol.MsgType.RST.value
+    return data[6:7]
+
+
 def receive_file(server_port):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_socket.bind(('', server_port))
     print('Server is ready!')
+    data, client_address = server_socket.recvfrom(2048)
+
+    if data[:1].decode('utf-8') == protocol.MsgType.SET.value:
+        num_fragment = read_set(data)
+        print('Server is initialized')
+    # else:
+    #    server_socket.sendto(bytes(protocol.MsgType.RST.value, 'utf-8'), client_address)
+
     data, client_address = server_socket.recvfrom(2048)
     data = data.decode('utf-8')
     file_name = data.strip()

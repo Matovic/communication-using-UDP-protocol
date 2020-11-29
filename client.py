@@ -13,19 +13,29 @@ import time
 
 
 def get_file_name(file_path):
-    head, tail = ntpath.split(file_path.decode('utf-8'))
-    return tail or ntpath.basename(head)
+    return ntpath.split(file_path.decode('utf-8'))[1]
+    # head, tail = ntpath.split(file_path.decode('utf-8'))
+    # print(head, tail)
+    # return tail or ntpath.basename(head)
 
 
 def send_file(server_ip, server_port, fragment_size, file_path):
     file_name = bytes(get_file_name(file_path), 'utf-8')
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    file_size = os.path.getsize(file_path)
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)        # set socket
+    client_socket.sendto(                                                   # initialization connection
+        protocol.msg_initialization(fragment_size, file_size),              # send info about file
+        (server_ip, server_port))                                           # server address
     client_socket.sendto(file_name, (server_ip, server_port))
     with open(file_path, 'rb+') as file:
         data = file.read(fragment_size)
+        fragment_count = 1
         while data:
-            if client_socket.sendto(data, (server_ip, server_port)):
+            new_data = protocol.add_header(protocol.MsgType.PSH, fragment_count, fragment_size, data)
+            if client_socket.sendto(new_data, (server_ip, server_port)):
                 data = file.read(fragment_size)
+                fragment_count += 1
                 time.sleep(0.02)
     modified_message, server_address = client_socket.recvfrom(fragment_size)
     print(modified_message.decode('utf-8'))
