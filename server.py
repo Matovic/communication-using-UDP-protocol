@@ -7,90 +7,105 @@ import protocol
 
 import socket
 import sys
+import os
 import select
 
 
-def read_set(data):
-    if data[7:8].decode('utf-8') != protocol.set_crc(data):
-        return protocol.MsgType.RST.value
-    return data[6:7]
+def write_msg(server_socket):
+    # while True:
+    message, client_address = server_socket.recvfrom(protocol.DEFAULT_BUFF)
+    print(message.decode('utf-8'))
+    server_socket.sendto(bytes(protocol.MsgReply.ACK.value, 'utf-8'), client_address)
+    #   break
+    #   if input('End? y/N?') == 'y':
+    #       break
+    #   else:
+    #       print('Server is ready!')
 
 
-def receive_file(server_port):
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_socket.bind(('', server_port))
-    print('Server is ready!')
-    data, client_address = server_socket.recvfrom(2048)
-
-    if data[:1].decode('utf-8') == protocol.MsgType.SET.value:
-        num_fragment = read_set(data)
-        print('Server is initialized')
-    # else:
-    #    server_socket.sendto(bytes(protocol.MsgType.RST.value, 'utf-8'), client_address)
-
-    data, client_address = server_socket.recvfrom(2048)
-    data = data.decode('utf-8')
-    file_name = data.strip()
-    with open('file_receive/' + file_name, 'wb+') as file:
+def write_file(path, server_socket, fragment_size):
+    with open(path, 'wb+') as file:
         while True:
             ready = select.select([server_socket], [], [], 3)
             if ready[0]:
-                data, client_address = server_socket.recvfrom(2048)
+                data, client_address = server_socket.recvfrom(fragment_size)
+                reply = protocol.check_crc(data)
+                server_socket.sendto(bytes(reply, 'utf-8'), client_address)
+
+                if reply != protocol.MsgType.ACK.value:
+                    continue
+                data = protocol.get_data(data)
                 file.write(data)
-            else:
-                print('Finish', file_name)
+            else:                                                                               # finish
+                # print('Finish', file_name)
                 break
-    server_socket.sendto(b'Message received!', client_address)
-    server_socket.close()
 
 
-def receive_message(server_port):
+def receive(server_port, dir_path):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_socket.bind(('', server_port))
     print('Server is ready!')
-    while 1:
-        message, client_address = server_socket.recvfrom(2048)
-        print(message.decode('utf-8'))
-        server_socket.sendto(b'Message received!', client_address)
-        if input('End? y/N?') == 'y':
+
+    while True:
+        data, client_address = server_socket.recvfrom(protocol.DEFAULT_BUFF)
+        reply = protocol.check_crc(data)
+        server_socket.sendto(bytes(reply, 'utf-8'), client_address)
+        if reply == protocol.MsgType.ACK.value:
+            fragment_size = protocol.get_fragmet_size(data) + len(data)
+            file_name = protocol.get_file_name(data)
             break
-        else:
-            print('Server is ready!')
+
+    if protocol.get_msg_type(data).decode('utf-8') == protocol.MsgType.SET.value:
+        write_file(dir_path + file_name, server_socket, fragment_size)
+        server_socket.sendto(bytes(protocol.MsgReply.ACK.value, 'utf-8'), client_address)
+        print('Transfer successful, file at', os.path.abspath(dir_path + file_name))
+    else:
+        write_msg(server_socket)
     server_socket.close()
 
 
 def set_server():
-    server_port = ''
-    while server_port == '':
+    server_port = 0
+    dir_path = ''
+    while server_port == 0 or dir_path == '':
         try:
-            server_port = int(input('Enter server port to listen: '))
-            if server_port < 1024:                                          # validate given port
+            if server_port == 0:
+                server_port = int(input('Enter server port to listen: '))
+
+            if server_port < 1024 or server_port > 65535:                   # validate given port
                 print('You must enter non - privileged port!')
-                server_port = ''
+                server_port = 0
                 continue
-        except ValueError:
+
+            dir_path = input('Enter file path to store files in: ')
+            if not os.path.isdir(dir_path):                                 # check if given path is valid
+                print('ERROR 01: Path', dir_path, 'does not exist!')
+                dir_path = ''
+                continue
+            if dir_path[:-1] != '/':                                        # check if dir name ends with /
+                dir_path += '/'
+
+        except ValueError:                                                  # wrong data type entered
             print('Wrong server port!')
-            server_port = ''
+            server_port = 0
             continue
-    return server_port
+
+    return server_port, dir_path
 
 
 def user_interface():
-    print('{:^30}'.format('server'))
-    server_port = set_server()
-    while 1:
+    print('\n{:^50}'.format('server'))
+    server_port, dir_path = set_server()
+    while True:
         print('0 - end\n'
               '1 - receive\n'
-              '2 - file\n'
               '9 - change to client')
         user_input = input('Enter what do you want to do: ')
         if user_input == '0':
             print('End')
             sys.exit(0)
         elif user_input == '1':
-            receive_message(server_port)
-        elif user_input == '2':
-            receive_file(server_port)
+            receive(server_port, dir_path)
         elif user_input == '9':
             client.user_interface()
         else:
