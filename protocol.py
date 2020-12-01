@@ -6,8 +6,10 @@
 import enum
 
 
-# HEADER_SIZE = 10
+HEADER_SIZE = 6
 DEFAULT_BUFF = 4096
+DEFAULT_FRAGMENT_LEN = 4
+FRAGMENT_MAX = 9999
 
 
 class MsgType(enum.Enum):
@@ -26,11 +28,21 @@ class MsgReply(enum.Enum):
     RST = 'Message corrupted'           # msg for negative acknowledgment
 
 
+def zero_fill(data):
+    count = DEFAULT_FRAGMENT_LEN - len(data) - 1
+    new_data = b'0'
+    while count > 0:
+        new_data += b'0'
+        count -= 1
+    new_data += data
+    return new_data
+
+
 def check_crc(data):
     # if data[7:8].decode('utf-8') != set_crc(data):
     if data[5:6].decode('utf-8') != set_crc(data):
-        return MsgType.RST.value
-    return MsgType.ACK.value
+        return MsgType.RST
+    return MsgType.ACK
 
 
 def set_crc(data):
@@ -54,34 +66,25 @@ def get_msg_type(data):
     return data[:1]
 
 
-def add_header(msg_type, serial_num, fragment_size, data):
-    # num_of_fragment = math.ceil(len(data) / fragment_size) \
-    #    if len(data) > fragment_size \
-    #    else 1
-    # checksum = set_crc(data)
-    # new_data = bytes(msg_type.value, 'utf-8') + bytes(str(serial_num), 'utf-8') + bytes(str(fragment_size), 'utf-8') \
-    #           + bytes(str(num_of_fragment), 'utf-8') + bytes(str(checksum), 'utf-8') + data[:]
-    # return new_data
-    new_data = bytes(msg_type.value, 'utf-8') + bytes(str(fragment_size), 'utf-8')
-    # checksum = set_crc(data)
+def add_header(msg_type, fragment_size, data):
+    fragment_size_bytes = zero_fill(bytes(str(fragment_size), 'utf-8'))
+    new_data = bytes(msg_type.value, 'utf-8') + fragment_size_bytes
     new_data += bytes(str(set_crc(data)), 'utf-8') + data
     return new_data
 
 
-def msg_initialization(fragment_size, file_size, file_name):
-    # num_of_fragment = math.ceil(file_size / fragment_size) \
-    #    if file_size > fragment_size \
-    #    else 1
-    # bytes(str(fragment_size), 'utf-8') + \
-    # data = bytes(MsgType.SET.value, 'utf-8') + bytes(str(0), 'utf-8') + bytes(str(fragment_size), 'utf-8') + \
-    #       bytes(str(num_of_fragment), 'utf-8')
+def msg_initialization(fragment_size, file_name):
+    # add msg type
     data = bytes(MsgType.SET.value, 'utf-8') if file_name != MsgType.SET_MSG.value else \
         bytes(MsgType.SET_MSG.value, 'utf-8')
-    data += bytes(str(fragment_size), 'utf-8') + bytes(str(set_crc(data)), 'utf-8')
+    fragment_size_bytes = zero_fill(bytes(str(fragment_size), 'utf-8'))
+
+    # add fragment size and checksum
+    data += fragment_size_bytes + bytes(str(set_crc(data)), 'utf-8')
+
+    # add data
     if file_name == MsgType.SET_MSG.value:
         data += bytes(file_name, 'utf-8')
     else:
         data += file_name
-    # checksum = set_crc(data)
-    # data += bytes(str(set_crc(data)), 'utf-8') + file_name
     return data
