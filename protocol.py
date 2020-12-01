@@ -8,7 +8,8 @@ import enum
 HEADER_SIZE = 6
 DEFAULT_BUFF = 4096
 DEFAULT_FRAGMENT_LEN = 4
-FRAGMENT_MAX = 9999
+FRAGMENT_MAX = 1466         # max_fragment = data(1500) - UDP header(8) - IP header(20) - my header(6) = 1466
+FRAGMENT_MIN = 16           # min_fragment = data(46) - UDP header(8) - IP header(20) - my header(6) = 12
 
 
 class MsgType(enum.Enum):

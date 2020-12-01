@@ -9,7 +9,7 @@ import socket
 import sys
 import os
 import ntpath
-import time
+# import time
 import math
 
 
@@ -94,17 +94,8 @@ def set_client():
 
             fragmentation = int(input('Enter max size of fragment: '))
 
-            # min_fragment = data(46) - UDP header(8) - IP header(20) - my header(6) = 12
-            if fragmentation < 12:                                           # validate given max value of fragment
-                # print('You cannot have fragments less than 1!')
-                fragmentation = 12
-                # continue
-
-            # max_fragment = data(1500) - UDP header(8) - IP header(20) - my header(6) = 1466
-            if fragmentation > 1466:                                         # validate given max value of fragment
-                # print('You cannot have fragments less than 1!')
-                fragmentation = 1466
-                # continue
+            if fragmentation < protocol.FRAGMENT_MIN:                       # validate given  value of fragment
+                fragmentation = protocol.FRAGMENT_MIN
 
             if fragmentation > protocol.FRAGMENT_MAX:                       # validate max fragment
                 fragmentation = protocol.FRAGMENT_MAX
