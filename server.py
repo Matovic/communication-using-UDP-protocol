@@ -15,7 +15,7 @@ def write_msg(server_socket):
     # while True:
     message, client_address = server_socket.recvfrom(protocol.DEFAULT_BUFF)
     print(message.decode('utf-8'))
-    server_socket.sendto(bytes(protocol.MsgReply.ACK.value, 'utf-8'), client_address)
+    server_socket.sendto(bytes(protocol.MsgType.ACK.value, 'utf-8'), client_address)
     #   break
     #   if input('End? y/N?') == 'y':
     #       break
@@ -24,6 +24,7 @@ def write_msg(server_socket):
 
 
 def write_file(path, server_socket, fragment_size):
+    fragment_count = 0
     with open(path, 'wb+') as file:
         while True:
             ready = select.select([server_socket], [], [], 3)
@@ -36,10 +37,12 @@ def write_file(path, server_socket, fragment_size):
                 if reply_crc.value != protocol.MsgType.ACK.value:
                     continue
                 data = protocol.get_data(data)
+                fragment_count += 1
                 file.write(data)
             else:                                                                               # finish
                 # print('Finish', file_name)
                 break
+    print(fragment_count)
 
 
 def initialization(server_socket):
@@ -47,7 +50,7 @@ def initialization(server_socket):
         data, client_address = server_socket.recvfrom(protocol.DEFAULT_BUFF)
         reply_crc = protocol.check_crc(data)
         reply = protocol.add_header(reply_crc, 0, b'')
-        print(reply, len(reply))
+        # print(reply, len(reply))
         server_socket.sendto(reply, client_address)
         if reply_crc.value == protocol.MsgType.ACK.value:
             fragment_size = protocol.get_fragmet_size(data) + len(data)

@@ -10,6 +10,7 @@ import sys
 import os
 import ntpath
 import time
+import math
 
 
 def get_file_name(file_path):
@@ -21,7 +22,7 @@ def initialization(client_socket, server_ip, server_port, fragment_size, data):
         client_socket.sendto(                                               # initialization connection
             protocol.msg_initialization(fragment_size, data),               # send info about file
             (server_ip, server_port))                                       # server address
-        print(fragment_size)
+        # print(fragment_size)
         new_data, server_address = client_socket.recvfrom(fragment_size)
         if new_data[:1].decode('utf-8') == protocol.MsgType.ACK.value:
             break
@@ -32,11 +33,12 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
     file_name = bytes(get_file_name(file_path), 'utf-8')
 
     file_size = os.path.getsize(file_path)
+    num_of_fragment = math.ceil(file_size / fragment_size) if file_size > fragment_size else 1
     try:
         initialization(client_socket, server_ip, server_port, fragment_size, file_name)
         with open(file_path, 'rb+') as file:
             data = file.read(fragment_size)
-            fragment_count = 1
+            fragment_count = 0
             while data:
                 new_data = protocol.add_header(protocol.MsgType.PSH, fragment_size, data)
                 if client_socket.sendto(new_data, (server_ip, server_port)):
@@ -44,12 +46,14 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
                     if data[:1].decode('utf-8') != protocol.MsgType.ACK.value:
                         print('negative acknowledgment msg')
                         continue
-                    print('positive acknowledgment msg')
+                    # print('positive acknowledgment msg')
                     data = file.read(fragment_size)
                     fragment_count += 1
-                    time.sleep(0.02)
-        modified_message, server_address = client_socket.recvfrom(fragment_size)
-        print(modified_message.decode('utf-8'))
+                    # time.sleep(0.02)
+        message, server_address = client_socket.recvfrom(fragment_size)
+        print(protocol.MsgReply.ACK.name, message)
+        print(fragment_count, num_of_fragment)
+        print('File at', os.path.abspath(file_path.decode('utf-8')))
     except ConnectionResetError:
         print('ERROR SERVER: Server closed connection - server is turned off or you entered wrong port or IP address')
 
@@ -89,9 +93,17 @@ def set_client():
                 continue
 
             fragmentation = int(input('Enter max size of fragment: '))
-            if fragmentation < 1:                                           # validate given max value of fragment
-                print('You cannot have fragments less than 1!')
-                fragmentation = ''
+
+            # min_fragment = data(46) - UDP header(8) - IP header(20) - my header(6) = 12
+            if fragmentation < 12:                                           # validate given max value of fragment
+                # print('You cannot have fragments less than 1!')
+                fragmentation = 12
+                # continue
+
+            # max_fragment = data(1500) - UDP header(8) - IP header(20) - my header(6) = 1466
+            if fragmentation > 1466:                                         # validate given max value of fragment
+                # print('You cannot have fragments less than 1!')
+                fragmentation = 1466
                 # continue
 
             if fragmentation > protocol.FRAGMENT_MAX:                       # validate max fragment

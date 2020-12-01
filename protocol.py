@@ -2,7 +2,6 @@
 # PKS
 # Zadanie 2: UDP communicator
 
-# import math
 import enum
 
 
@@ -29,6 +28,8 @@ class MsgReply(enum.Enum):
 
 
 def zero_fill(data):
+    if DEFAULT_FRAGMENT_LEN == len(data):
+        return data
     count = DEFAULT_FRAGMENT_LEN - len(data) - 1
     new_data = b'0'
     while count > 0:
@@ -39,7 +40,6 @@ def zero_fill(data):
 
 
 def check_crc(data):
-    # if data[7:8].decode('utf-8') != set_crc(data):
     if data[5:6].decode('utf-8') != set_crc(data):
         return MsgType.RST
     return MsgType.ACK
