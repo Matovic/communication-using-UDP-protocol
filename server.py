@@ -20,7 +20,7 @@ def write_msg(server_socket, fragment_size):
             reply_crc = protocol.check_crc(message)
             reply = protocol.add_header(reply_crc, fragment_size, b'')
             server_socket.sendto(reply, client_address)
-            if reply_crc.value != protocol.MsgType.ACK.value:
+            if reply_crc.value != protocol.MsgType.ACK.value:                       # ARQ Stop & Wait
                 continue
             message = protocol.get_data(message)
             print(message.decode('utf-8'), end='')
@@ -55,6 +55,7 @@ def write_file(path, server_socket, fragment_size):
 def initialization(server_socket):
     while True:
         data, client_address = server_socket.recvfrom(protocol.DEFAULT_BUFF)
+        # print('server po ini:', data)
         reply_crc = protocol.check_crc(data)
         reply = protocol.add_header(reply_crc, 0, b'')
         # print(reply, len(reply))

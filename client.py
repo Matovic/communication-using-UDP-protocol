@@ -33,7 +33,7 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
     file_name = bytes(get_file_name(file_path), 'utf-8')
 
     file_size = os.path.getsize(file_path)
-    num_of_fragment = math.ceil(file_size / fragment_size) if file_size > fragment_size else 1
+    num_of_fragment = math.ceil(file_size / fragment_size)                      # if file_size > fragment_size else 1
     try:
         initialization(client_socket, server_ip, server_port, fragment_size, file_name)
         with open(file_path, 'rb+') as file:
@@ -43,7 +43,7 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
                 new_data = protocol.add_header(protocol.MsgType.PSH, fragment_size, data)
                 if client_socket.sendto(new_data, (server_ip, server_port)):
                     data, server_address = client_socket.recvfrom(fragment_size)
-                    if data[:1].decode('utf-8') != protocol.MsgType.ACK.value:
+                    if data[:1].decode('utf-8') != protocol.MsgType.ACK.value:                  # ARQ Stop & Wait
                         print('negative acknowledgment msg')
                         continue
                     # print('positive acknowledgment msg')
@@ -61,12 +61,13 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
 def send_message(server_ip, client_socket, server_port, fragment_size, message):
     fragment_count = 0
     try:
-        initialization(client_socket, server_ip, server_port, fragment_size, protocol.MsgType.SET_MSG.value)
+        initialization(client_socket, server_ip, server_port, fragment_size,
+                       bytes(protocol.MsgType.SET_MSG.value, 'utf-8'))
         lenght = math.ceil(len(message) / fragment_size)
         server_reply = ''
         index1 = 0
         index2 = fragment_size
-        print('len =', lenght)
+        # print('len =', lenght)
         while lenght > 0:
             data = protocol.add_header(protocol.MsgType.PSH, fragment_size, message[index1:index2])
             client_socket.sendto(data, (server_ip, server_port))
@@ -148,7 +149,7 @@ def user_interface():
         elif user_input == '2':
             file = bytes(input('Enter path to the file: '), 'utf-8')
             if not os.path.isfile(file):                                          # check if given path is valid
-                print('ERROR 01: Path', file, 'does not exist!')
+                print('ERROR 01: Path', file.decode('utf-8'), 'does not exist!')
                 continue
             send_file(server_ip, client_socket, server_port, fragmentation + protocol.HEADER_SIZE, file)
         elif user_input == '9':

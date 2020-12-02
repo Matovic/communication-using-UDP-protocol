@@ -9,7 +9,8 @@ HEADER_SIZE = 6
 DEFAULT_BUFF = 4096
 DEFAULT_FRAGMENT_LEN = 4
 FRAGMENT_MAX = 1466         # max_fragment = data(1500) - UDP header(8) - IP header(20) - my header(6) = 1466
-FRAGMENT_MIN = 16           # min_fragment = data(46) - UDP header(8) - IP header(20) - my header(6) = 12
+FRAGMENT_MIN = 12           # min_fragment = data(46) - UDP header(8) - IP header(20) - my header(6) = 12
+CRC_KEY = '1001'            # x^3 + 1
 
 
 class MsgType(enum.Enum):
@@ -40,15 +41,51 @@ def zero_fill(data):
     return new_data
 
 
-def check_crc(data):
-    if data[5:6].decode('utf-8') != set_crc(data):
-        return MsgType.RST
-    return MsgType.ACK
+def xor(a, b):
+    result = []                                            # initialize result
+    for i in range(1, len(b)):                             # go through all bits
+        if a[i] == b[i]:                                   # same - XOR is 0
+            result.append('0')
+            continue
+        result.append('1')                                 # not same - XOR is 1
+    return ''.join(result)
+
+
+def sum_checksum(checksum):
+    sum_digit = 0
+    for char in checksum:
+        if char.isdigit():
+            sum_digit += int(char)
+    return str(sum_digit)
 
 
 def set_crc(data):
-    checksum = '1'
-    return checksum
+    # print('data', str(data), data)
+    crc_key_len = len(CRC_KEY)
+    bin_data = (''.join(format(ord(char), 'b') for char in str(data))) + ('0' * (crc_key_len - 1))
+    # print('bin_data:', bin_data)
+    checksum = bin_data[:crc_key_len]
+    # print('check pred:', checksum)
+    while crc_key_len < len(bin_data):
+        if checksum[0] == '1':
+            checksum = xor(CRC_KEY, checksum) + bin_data[crc_key_len]
+        else:
+            checksum = xor('0' * crc_key_len, checksum) + bin_data[crc_key_len]
+        crc_key_len += 1
+    if checksum[0] == '1':
+        checksum = xor(CRC_KEY, checksum)
+    else:
+        checksum = xor('0' * crc_key_len, checksum)
+    # print('check po:', checksum)
+    # print('sum', sum_checksum(checksum))
+    return sum_checksum(checksum)
+
+
+def check_crc(data):
+    # print('ideme checkuvat', data[6:])
+    if data[5:6].decode('utf-8') != set_crc(data[6:]):
+        return MsgType.RST
+    return MsgType.ACK
 
 
 def get_fragmet_size(data):
@@ -70,22 +107,30 @@ def get_msg_type(data):
 def add_header(msg_type, fragment_size, data):
     fragment_size_bytes = zero_fill(bytes(str(fragment_size), 'utf-8'))
     new_data = bytes(msg_type.value, 'utf-8') + fragment_size_bytes
-    new_data += bytes(str(set_crc(data)), 'utf-8') + data
+    # print('+hlavicka', new_data, data)
+    checksum = set_crc(data)
+    new_data += bytes(checksum, 'utf-8') + data
+    # print('+ po hlavicka', new_data)
     return new_data
 
 
-def msg_initialization(fragment_size, file_name):
+def msg_initialization(fragment_size, data):
     # add msg type
-    data = bytes(MsgType.SET.value, 'utf-8') if file_name != MsgType.SET_MSG.value else \
+    new_data = bytes(MsgType.SET.value, 'utf-8') if data != bytes(MsgType.SET_MSG.value, 'utf-8') else \
         bytes(MsgType.SET_MSG.value, 'utf-8')
     fragment_size_bytes = zero_fill(bytes(str(fragment_size), 'utf-8'))
 
-    # add fragment size and checksum
-    data += fragment_size_bytes + bytes(str(set_crc(data)), 'utf-8')
+    # print('inicializacia', data)
+    # add fragment size
 
-    # add data
-    if file_name == MsgType.SET_MSG.value:
-        data += bytes(file_name, 'utf-8')
-    else:
-        data += file_name
-    return data
+    # add checksum and new_data
+    # if data == MsgType.SET_MSG.value:
+    #    checksum = set_crc(data)
+    #    new_data += fragment_size_bytes + bytes(checksum, 'utf-8')
+    #    new_data += bytes(data, 'utf-8')
+    # else:
+    checksum = set_crc(data)
+    new_data += fragment_size_bytes + bytes(checksum, 'utf-8')
+    new_data += data
+    # print('po inicializacii:', new_data)
+    return new_data
