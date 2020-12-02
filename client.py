@@ -59,13 +59,26 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
 
 
 def send_message(server_ip, client_socket, server_port, fragment_size, message):
+    fragment_count = 0
     try:
         initialization(client_socket, server_ip, server_port, fragment_size, protocol.MsgType.SET_MSG.value)
-        client_socket.sendto(message, (server_ip, server_port))
-        server_reply, server_address = client_socket.recvfrom(fragment_size)
+        lenght = math.ceil(len(message) / fragment_size)
+        server_reply = ''
+        index1 = 0
+        index2 = fragment_size
+        print('len =', lenght)
+        while lenght > 0:
+            data = protocol.add_header(protocol.MsgType.PSH, fragment_size, message[index1:index2])
+            client_socket.sendto(data, (server_ip, server_port))
+            server_reply, server_address = client_socket.recvfrom(fragment_size)
+            lenght -= 1
+            index1 += fragment_size
+            index2 += fragment_size
+            fragment_count += 1
         print(server_reply.decode('utf-8'))
     except ConnectionResetError:
         print('ERROR SERVER: Server closed connection - server is turned off or you entered wrong port or IP address')
+    print(fragment_count)
 
 
 def set_client():

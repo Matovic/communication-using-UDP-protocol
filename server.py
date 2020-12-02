@@ -11,16 +11,23 @@ import os
 import select
 
 
-def write_msg(server_socket):
-    # while True:
-    message, client_address = server_socket.recvfrom(protocol.DEFAULT_BUFF)
-    print(message.decode('utf-8'))
-    server_socket.sendto(bytes(protocol.MsgType.ACK.value, 'utf-8'), client_address)
-    #   break
-    #   if input('End? y/N?') == 'y':
-    #       break
-    #   else:
-    #       print('Server is ready!')
+def write_msg(server_socket, fragment_size):
+    fragment_count = 0
+    while True:
+        ready = select.select([server_socket], [], [], 3)
+        if ready[0]:
+            message, client_address = server_socket.recvfrom(protocol.DEFAULT_BUFF)
+            reply_crc = protocol.check_crc(message)
+            reply = protocol.add_header(reply_crc, fragment_size, b'')
+            server_socket.sendto(reply, client_address)
+            if reply_crc.value != protocol.MsgType.ACK.value:
+                continue
+            message = protocol.get_data(message)
+            print(message.decode('utf-8'), end='')
+            fragment_count += 1
+        else:
+            break
+    print('\n', fragment_count)
 
 
 def write_file(path, server_socket, fragment_size):
@@ -70,7 +77,7 @@ def receive(server_port, dir_path):
         server_socket.sendto(bytes(protocol.MsgType.ACK.value, 'utf-8'), client_address)
         print('Transfer successful, file at', os.path.abspath(dir_path + file_name))
     else:
-        write_msg(server_socket)
+        write_msg(server_socket, fragment_size)
     server_socket.close()
 
 
