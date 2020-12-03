@@ -1,16 +1,21 @@
-# Erik Matovic
-# PKS
-# Zadanie 2: UDP communicator
+"""UDP communicator provides client-server communication with file transfer based on UDP.
+
+School assignment n. 2 from course Computer and Communication Networks.
+"""
 
 import server
 import protocol
-
 import socket
 import sys
 import os
 import ntpath
-# import time
 import math
+import time
+
+__author__ = "Erik Matovic"
+__version__ = "1.0.0"
+__email__ = "xmatovice@stuba.sk"
+__status__ = "Production"
 
 
 def get_file_name(file_path):
@@ -30,28 +35,38 @@ def initialization(client_socket, server_ip, server_port, fragment_size, data):
 
 
 def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
-    file_name = bytes(get_file_name(file_path), 'utf-8')
+    user_input_mistake = input('Make a mistake in transfer? y/n ')
+    if user_input_mistake.lower() != 'y' and user_input_mistake.lower() != 'n':
+        print('Wrong input!')
+        send_file(server_ip, client_socket, server_port, fragment_size, file_path)
 
+    file_name = bytes(get_file_name(file_path), 'utf-8')
     file_size = os.path.getsize(file_path)
-    num_of_fragment = math.ceil(file_size / fragment_size)                      # if file_size > fragment_size else 1
+    num_of_fragment = math.ceil(file_size / (fragment_size - protocol.HEADER_SIZE))
     try:
         initialization(client_socket, server_ip, server_port, fragment_size, file_name)
+        start_time = time.time()
         with open(file_path, 'rb+') as file:
-            data = file.read(fragment_size)
+            data = file.read(fragment_size - protocol.HEADER_SIZE)
             fragment_count = 0
             while data:
                 new_data = protocol.add_header(protocol.MsgType.PSH, fragment_size, data)
+                if user_input_mistake == 'y':
+                    header = new_data[:6]
+                    new_data = header + new_data[10:]
+                    user_input_mistake = 'n'
                 if client_socket.sendto(new_data, (server_ip, server_port)):
-                    data, server_address = client_socket.recvfrom(fragment_size)
-                    if data[:1].decode('utf-8') != protocol.MsgType.ACK.value:                  # ARQ Stop & Wait
+                    reply, server_address = client_socket.recvfrom(fragment_size)
+                    if reply[:1].decode('utf-8') != protocol.MsgType.ACK.value:                  # ARQ Stop & Wait
                         print('negative acknowledgment msg')
                         continue
                     # print('positive acknowledgment msg')
-                    data = file.read(fragment_size)
+                    data = file.read(fragment_size - protocol.HEADER_SIZE)
                     fragment_count += 1
-                    # time.sleep(0.02)
         message, server_address = client_socket.recvfrom(fragment_size)
-        print(protocol.MsgReply.ACK.name, message)
+        end_time = time.time()
+        print(protocol.MsgReply.ACK.value)
+        print('Time:', end_time - start_time)
         print(fragment_count, num_of_fragment)
         print('File at', os.path.abspath(file_path.decode('utf-8')))
     except ConnectionResetError:
@@ -60,6 +75,7 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
 
 def send_message(server_ip, client_socket, server_port, fragment_size, message):
     fragment_count = 0
+    num_of_fragment = math.ceil(len(message.decode('utf-8')) / (fragment_size))
     try:
         initialization(client_socket, server_ip, server_port, fragment_size,
                        bytes(protocol.MsgType.SET_MSG.value, 'utf-8'))
@@ -79,7 +95,7 @@ def send_message(server_ip, client_socket, server_port, fragment_size, message):
         print(server_reply.decode('utf-8'))
     except ConnectionResetError:
         print('ERROR SERVER: Server closed connection - server is turned off or you entered wrong port or IP address')
-    print(fragment_count)
+    print(fragment_count, num_of_fragment)
 
 
 def set_client():

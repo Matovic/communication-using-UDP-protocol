@@ -1,14 +1,19 @@
-# Erik Matovic
-# PKS
-# Zadanie 2: UDP communicator
+"""UDP communicator provides client-server communication with file transfer based on UDP.
+
+School assignment n. 2 from course Computer and Communication Networks.
+"""
 
 import client
 import protocol
-
 import socket
 import sys
 import os
 import select
+
+__author__ = "Erik Matovic"
+__version__ = "1.0.0"
+__email__ = "xmatovice@stuba.sk"
+__status__ = "Production"
 
 
 def write_msg(server_socket, fragment_size):

@@ -1,15 +1,21 @@
-# Erik Matovic
-# PKS
-# Zadanie 2: UDP communicator
+"""UDP communicator provides client-server communication with file transfer based on UDP.
+
+School assignment n. 2 from course Computer and Communication Networks.
+"""
 
 import enum
+
+__author__ = "Erik Matovic"
+__version__ = "1.0.0"
+__email__ = "xmatovice@stuba.sk"
+__status__ = "Production"
 
 
 HEADER_SIZE = 6
 DEFAULT_BUFF = 4096
 DEFAULT_FRAGMENT_LEN = 4
 FRAGMENT_MAX = 1466         # max_fragment = data(1500) - UDP header(8) - IP header(20) - my header(6) = 1466
-FRAGMENT_MIN = 12           # min_fragment = data(46) - UDP header(8) - IP header(20) - my header(6) = 12
+FRAGMENT_MIN = 1           # min_fragment = data(46) - UDP header(8) - IP header(20) - my header(6) = 12
 CRC_KEY = '1001'            # x^3 + 1
 
 
@@ -18,6 +24,7 @@ class MsgType(enum.Enum):
     PSH = '1'       # constant for header for pushing for file transfer
     ACK = '2'       # constant for header for positive acknowledgment
     RST = '3'       # constant for header for negative acknowledgment
+    KAP = '4'       # constant for header for keep alive packet
 
     SET_MSG = '8'   # constant for header in initialization for msg transfer
     PSH_MSG = '9'   # constant for header for pushing for msg transfer
@@ -107,30 +114,16 @@ def get_msg_type(data):
 def add_header(msg_type, fragment_size, data):
     fragment_size_bytes = zero_fill(bytes(str(fragment_size), 'utf-8'))
     new_data = bytes(msg_type.value, 'utf-8') + fragment_size_bytes
-    # print('+hlavicka', new_data, data)
     checksum = set_crc(data)
     new_data += bytes(checksum, 'utf-8') + data
-    # print('+ po hlavicka', new_data)
     return new_data
 
 
 def msg_initialization(fragment_size, data):
-    # add msg type
     new_data = bytes(MsgType.SET.value, 'utf-8') if data != bytes(MsgType.SET_MSG.value, 'utf-8') else \
-        bytes(MsgType.SET_MSG.value, 'utf-8')
-    fragment_size_bytes = zero_fill(bytes(str(fragment_size), 'utf-8'))
-
-    # print('inicializacia', data)
-    # add fragment size
-
-    # add checksum and new_data
-    # if data == MsgType.SET_MSG.value:
-    #    checksum = set_crc(data)
-    #    new_data += fragment_size_bytes + bytes(checksum, 'utf-8')
-    #    new_data += bytes(data, 'utf-8')
-    # else:
-    checksum = set_crc(data)
-    new_data += fragment_size_bytes + bytes(checksum, 'utf-8')
-    new_data += data
-    # print('po inicializacii:', new_data)
-    return new_data
+        bytes(MsgType.SET_MSG.value, 'utf-8')                               # add msg type
+    fragment_size_bytes = zero_fill(bytes(str(fragment_size), 'utf-8'))     # fill fragment size with zeros, if less 4
+    checksum = set_crc(data)                                                # get checksum
+    new_data += fragment_size_bytes + bytes(checksum, 'utf-8')              # add fragment size and checksum
+    new_data += data                                                        # add data
+    return new_data                                                         # return header + data as new data
