@@ -8,7 +8,7 @@ import server
 import sys
 
 __author__ = "Erik Matovic"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __email__ = "xmatovice@stuba.sk"
 __status__ = "Production"
 

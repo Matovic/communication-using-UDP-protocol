@@ -14,7 +14,7 @@ import math
 import time
 
 __author__ = "Erik Matovic"
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __email__ = "xmatovice@stuba.sk"
 __status__ = "Production"
 
@@ -75,6 +75,7 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
     file_size = os.path.getsize(file_path)
     num_of_fragment = math.ceil(file_size / (fragment_size - protocol.HEADER_SIZE))
 
+    nack_fragment, all_fragment = 0, 0                                                              # doimplementacia
     try:
         if initialization(client_socket, server_ip, server_port, fragment_size,
                           file_name + bytes(str(num_of_fragment), 'utf-8')) == 0:
@@ -87,16 +88,18 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
                 new_data = protocol.add_header(protocol.MsgType.PSH, fragment_size, data)
                 if user_input_mistake == 'y':
                     header = new_data[:6]
-                    new_data = header + new_data[10:]
+                    new_data = header + new_data[20:]
                     user_input_mistake = 'n'
                 if client_socket.sendto(new_data, (server_ip, server_port)):
                     reply, server_address = client_socket.recvfrom(fragment_size)
                     if reply[:1].decode('utf-8') != protocol.MsgType.ACK.value:  # ARQ Stop & Wait
                         print('negative acknowledgment msg')
-                        continue
-
-                    data = file.read(fragment_size - protocol.HEADER_SIZE)
-                    fragment_count += 1
+                        nack_fragment += 1                                                          # doimplementacia
+                        all_fragment += 1                                                           # doimplementacia
+                    else:
+                        data = file.read(fragment_size - protocol.HEADER_SIZE)
+                        fragment_count += 1
+                        all_fragment += 1                                                           # doimplementacia
 
         ready = select.select([client_socket], [], [], 5)
         if ready[0]:
@@ -106,6 +109,9 @@ def send_file(server_ip, client_socket, server_port, fragment_size, file_path):
                 print('Time:', end_time - start_time)
                 print('File at', os.path.abspath(file_path.decode('utf-8')))
                 print('Send fragments are', fragment_count, 'and counted fragments are', num_of_fragment, '\n')
+
+                # doimplementacia
+                print('Send fragments are', all_fragment, 'and nack fragments are ', nack_fragment, '\n')
         else:
             print('Connection not established')
             return
@@ -126,12 +132,12 @@ def send_message(server_ip, client_socket, server_port, fragment_size, message):
     fragment_count = 0
     num_of_fragment = math.ceil(len(message.decode('utf-8')) / fragment_size)
 
+    nack_fragment, all_fragment = 0, 0                                                              # doimplementacia
     try:
         if initialization(client_socket, server_ip, server_port, fragment_size + protocol.HEADER_SIZE,
                           bytes(protocol.MsgType.SET_MSG.value, 'utf-8') + bytes(str(num_of_fragment), 'utf-8')) == 0:
             return
         lenght = math.ceil(len(message) / fragment_size)
-        # server_reply = ''
         index1, index2 = 0, fragment_size
 
         while lenght > 0:
@@ -139,11 +145,17 @@ def send_message(server_ip, client_socket, server_port, fragment_size, message):
             client_socket.sendto(data, (server_ip, server_port))
             ready = select.select([client_socket], [], [], 5)
             if ready[0]:
-                if client_socket.recvfrom(fragment_size + protocol.HEADER_SIZE):
+                reply, server_address = client_socket.recvfrom(fragment_size + protocol.HEADER_SIZE)
+                if reply[:1].decode('utf-8') != protocol.MsgType.ACK.value:  # ARQ Stop & Wait
+                    print('negative acknowledgment msg')
+                    nack_fragment += 1                                                              # doimplementacia
+                    all_fragment += 1                                                               # doimplementacia
+                else:
                     index1 += fragment_size
                     index2 += fragment_size
                     lenght -= 1
                     fragment_count += 1
+                    all_fragment += 1                                                               # doimplementacia
             else:
                 print('Connection not established')
                 return
@@ -151,6 +163,9 @@ def send_message(server_ip, client_socket, server_port, fragment_size, message):
     except ConnectionResetError:
         print('Connection lost. Turn server on.')
     print('Send fragments are', fragment_count, 'and counted fragments are', num_of_fragment, '\n')
+
+    # doimplementacia
+    print('Send fragments are', all_fragment, 'and nack fragments are ', nack_fragment, '\n')
 
 
 def set_client():
